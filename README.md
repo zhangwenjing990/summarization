@@ -1,4 +1,7 @@
 # summarization
+
+本项目详细的文档总结地址：https://shimo.im/docs/QDQ9c3pccYC3H3q6/ 《自动摘要项目实战》
+
 ## 任务描述
 
 ​	摘要是对一段文本重要内容的总结。目前基于NLP的文本摘要任务主要有两种方式：抽取式和生成式。
@@ -21,7 +24,7 @@
 
 ## 模型结果
 
-baseline模型的rouge分数如下：
+baseline模型的ROUGE和BLUE分数如下：
 
 ```
 ---------------------------------------------
@@ -61,7 +64,7 @@ ratio =  0.8741818181818182
 ```
 
 
-pointer-generator模型的rouge分数如下：
+pointer-generator模型的ROUGE和BLUE分数如下：
 
 ​ 
 
@@ -103,7 +106,7 @@ ratio =  0.9565784114052953
 ```
 
 
-unilm模型的rouge分数如下：
+unilm模型的ROUGE和BLUE分数如下：
 
 ​ 
 
