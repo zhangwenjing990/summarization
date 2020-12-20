@@ -6,17 +6,17 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from utils_pg import *
 
 class WordProbLayer(nn.Module):
-    def __init__(self, hidden_size, encode_outputs_size, dim_y, dict_size, device):
+    def __init__(self, hidden_size, encode_outputs_size, embedding_size, dict_size, device):
         super(WordProbLayer, self).__init__()
         self.hidden_size = hidden_size
         self.encode_outputs_size = encode_outputs_size
-        self.dim_y = dim_y
+        self.embedding_size = embedding_size
         self.dict_size = dict_size
         self.device = device
 
-        self.V1 = nn.Linear(self.hidden_size + self.encode_outputs_size + self.dim_y, self.hidden_size)
+        self.V1 = nn.Linear(self.hidden_size + self.encode_outputs_size + self.embedding_size, self.hidden_size)
         self.V2 = nn.Linear(self.hidden_size, self.dict_size)
-        self.W = nn.Linear(self.hidden_size + self.encode_outputs_size + self.dim_y, 1)
+        self.W = nn.Linear(self.hidden_size + self.encode_outputs_size + self.embedding_size, 1)
 
     def forward(self, decode_hidden_states, context_vector, embedded_y, att_dist=None, xids=None, max_ext_len=None):
         h = torch.cat((decode_hidden_states, context_vector, embedded_y), 2)
@@ -78,67 +78,69 @@ class Decoder(nn.Module):
 
 
 
-    def forward(self, embedded_y, encode_outputs, init_state, x_mask, y_mask, xid=None, init_coverage=None):
+    def forward(self, embedded_y, encode_outputs, init_state, x_mask, y_mask, x_index=None, init_coverage=None):
         decode_seq_len = embedded_y.size()[0]
         hidden = init_state
-        xid = torch.transpose(xid, 0, 1)  # [batch_size, enc_seq_len]
+        x_index = torch.transpose(x_index, 0, 1)  # [batch_size, enc_seq_len]
         coverage_vector = init_coverage
 
         hidden_states = torch.zeros((decode_seq_len, *hidden.size()), device=self.device)
         context_vecotors = torch.zeros((decode_seq_len, *encode_outputs[0, :, :].size()), device=self.device)
-        words_attention_weights = torch.zeros((decode_seq_len, *xid.size()), device=self.device)
+        words_attention_weights = torch.zeros((decode_seq_len, *x_index.size()), device=self.device)
         coverage_vectors_all = torch.zeros((decode_seq_len + 1, *coverage_vector.size()), device=self.device)
-        xids_ = torch.zeros((decode_seq_len, *xid.size()), device=self.device, dtype=torch.int64)
+        x_indexes = torch.zeros((decode_seq_len, *x_index.size()), device=self.device, dtype=torch.int64)
 
 
         for t in range(decode_seq_len):
+
             coverage_vectors_all[t, :, :] = coverage_vector
             hidden, att, att_dist, coverage_vector = self.decode_one_step(embedded_y[t], y_mask[t], hidden, encode_outputs, x_mask,
                                                            coverage_vector)
             hidden_states[t, :, :] = hidden
             context_vecotors[t, :, :] = att
             words_attention_weights[t, :, :] = att_dist
-            xids_[t, :, :] = xid
+            x_indexes[t, :, :] = x_index
+
 
         if self.is_predicting:
-            cs += [coverage_vector]
-            cs = cs[1:]
+
             coverage_vectors_all[-1, :, :] = coverage_vector
             coverage_vectors = coverage_vectors_all[1:, :, :]
         else:
             coverage_vectors = coverage_vectors_all[:-1, :, :]
 
-        return hidden_states, context_vecotors, words_attention_weights, xids_, coverage_vectors
+
+        return hidden_states, context_vecotors, words_attention_weights, x_indexes, coverage_vectors
 
 
 class Model(nn.Module):
-    def __init__(self, modules, consts, options):
+    def __init__(self, cfg):
         super(Model, self).__init__()
 
-        self.is_predicting = options["is_predicting"]
-        self.is_bidirectional = options["is_bidirectional"]
-        self.beam_decoding = options["beam_decoding"]
-        self.cell = options["cell"]
-        self.device = options["device"]
-        self.copy = options["copy"]
-        self.coverage = options["coverage"]
-        self.avg_nll = options["avg_nll"]
+        self.cfg = cfg
+        # self.is_predicting = cfg["is_predicting"]
+        # self.is_bidirectional = cfg["is_bidirectional"]
+        # self.beam_decoding = cfg["beam_decoding"]
+        # self.cell = cfg["cell"]
+        self.device = self.cfg.device
+        # self.copy = cfg["copy"]
+        # self.coverage = cfg["coverage"]
+        # self.avg_nll = cfg["avg_nll"]
 
-        self.dim_x = consts["dim_x"]
-        self.dim_y = consts["dim_y"]
-        self.len_x = consts["len_x"]
-        self.len_y = consts["len_y"]
-        self.hidden_size = consts["hidden_size"]
-        self.dict_size = consts["dict_size"]
-        self.pad_token_idx = consts["pad_token_idx"]
-        self.ctx_size = self.hidden_size * 2 if self.is_bidirectional else self.hidden_size
+        self.embedding_size = self.cfg.embedding_size
+        # self.len_x = cfg["len_x"]
+        # self.len_y = cfg["len_y"]
+        self.hidden_size = self.cfg.hidden_size
+        self.dict_size = self.cfg.dict_size
+        self.pad_token_idx = self.cfg.pad_token_idx
+        self.ctx_size = self.hidden_size * 2
 
-        self.embeddings = nn.Embedding(self.dict_size, self.dim_x, self.pad_token_idx)
-        self.encoder = nn.GRU(self.dim_x, self.hidden_size, bidirectional=self.is_bidirectional)
-        self.decoder = Decoder(self.dim_y, self.hidden_size, self.ctx_size, self.device, self.is_predicting)
+        self.embeddings = nn.Embedding(self.dict_size, self.embedding_size, self.pad_token_idx)
+        self.encoder = nn.GRU(self.embedding_size, self.hidden_size, bidirectional=True)
+        self.decoder = Decoder(self.embedding_size, self.hidden_size, self.ctx_size, self.device, self.cfg.is_predicting)
 
         self.decode_apdapter = nn.Linear(self.ctx_size, self.hidden_size)
-        self.word_prob = WordProbLayer(self.hidden_size, self.ctx_size, self.dim_y, self.dict_size, self.device)
+        self.word_prob = WordProbLayer(self.hidden_size, self.ctx_size, self.embedding_size, self.dict_size, self.device)
         self.loss = torch.nn.NLLLoss(ignore_index=0)
 
     def encode(self, input_x, len_x):
@@ -156,10 +158,9 @@ class Model(nn.Module):
     def decode_once(self, y, encode_outputs, dec_init_state, mask_x, x=None, max_ext_len=None, coverage_vector=None):
         batch_size = encode_outputs.size(1)
         if torch.sum(y) < 0:
-            embedded_y = torch.zeros((1, batch_size, self.dim_y)).to(self.device)
+            embedded_y = torch.zeros((1, batch_size, self.embedding_size)).to(self.device)
         else:
             embedded_y = self.embeddings(y)
-        mask_y = torch.ones((1, batch_size, 1)).to(self.device)
         mask_y = torch.ones((1, batch_size, 1)).to(self.device)
 
         dec_status, atted_context, att_dist, xids, C = self.decoder(embedded_y, encode_outputs, dec_init_state, mask_x, mask_y,

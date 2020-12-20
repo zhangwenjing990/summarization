@@ -1,74 +1,57 @@
 import os
+import torch
+import pickle
 
 
-class CommonConfigs(object):
-    def __init__(self, d_type):
-        self.ROOT_PATH = os.getcwd() + "/"
-        self.TRAINING_DATA_PATH = self.ROOT_PATH + d_type + "/train_set/"
-        self.VALIDATE_DATA_PATH = self.ROOT_PATH + d_type + "/validate_set/"
-        self.TESTING_DATA_PATH = self.ROOT_PATH + d_type + "/test_set/"
-        self.RESULT_PATH = self.ROOT_PATH + d_type + "/result/"
-        self.MODEL_PATH = self.ROOT_PATH + d_type + "/model/"
-        self.BEAM_SUMM_PATH = self.RESULT_PATH + "/beam_summary/"
-        self.BEAM_GT_PATH = self.RESULT_PATH + "/beam_ground_truth/"
-        self.GROUND_TRUTH_PATH = self.RESULT_PATH + "/ground_truth/"
-        self.SUMM_PATH = self.RESULT_PATH + "/summary/"
-        self.TMP_PATH = self.ROOT_PATH + d_type + "/tmp/"
+class Configs(object):
+    def __init__(self):
+        # 数据和模型路径
+        self.root_path = os.getcwd()
+        self.train_data_path = self.root_path + '/splited_data/train/*'
+        self.valid_data_path = self.root_path + '/splited_data/valid/*'
+        # self.test_data_path = self.root_path + '/splited_data/test/*'
+        self.test_data_path = self.root_path + '/lcsts/test_set/'
+
+        self.vocab_path = self.root_path + '/splited_data/'
+        self.save_model_path = self.root_path + '/outputs/models/'
+        self.rouge_path = self.root_path + '/outputs/'
+        self.beam_decode_path = self.root_path + '/outputs/beam_decode/'
+        self.ground_truth_path = self.root_path + '/outputs/ground_truth/'
 
 
-class Training(object):
-    IS_UNICODE = True
-    REMOVES_PUNCTION = False
-    HAS_Y = True
-    BATCH_SIZE = 32 * 6
+        # 重新生成字典 todo
+        [_, dic, hfw, w2i, i2w, w2w] = pickle.load(open(self.vocab_path + "dic.pkl", "rb"))
+        self.dict_size = len(dic)
+        self.dic = dic
+        self.w2i = w2i
+        self.i2w = i2w
+        self.lfw_emb = self.w2i['<unk>']
+        self.eos_emb = self.w2i['<eos>']
+        self.pad_token_idx = self.w2i['<pad>']
+
+        # 模型基本配置
+        self.norm_clip = 2
+        self.embedding_size = 150
+        self.hidden_size = 150
 
 
-class Testing(object):
-    IS_UNICODE = True
-    HAS_Y = True
-    BATCH_SIZE = 100
-    MIN_LEN_PREDICT = 10
-    MAX_LEN_PREDICT = 20
-    MAX_BYTE_PREDICT = None
-    PRINT_SIZE = 500
-    REMOVES_PUNCTION = False
 
 
-class Configs():
-    cc = CommonConfigs("lcsts")
+        # 训练/预测模式配置和设备
+        self.is_predicting = False
+        self.coverage = False
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.max_epoch = 50
+        self.batch_size = 32 * 4
+        self.lr = 0.001
+        self.len_x = 120
+        self.len_y = 50
+        self.has_y = True
+        self.beam_size = 3
+        self.min_len_predict = 10
+        self.max_len_predict = 20
 
-    CELL = "gru"  # gru or lstm
-    CUDA = True
-    COPY = True
-    COVERAGE = True
-    BI_RNN = True
-    BEAM_SEARCH = True
-    BEAM_SIZE = 10
-    AVG_NLL = True
-    NORM_CLIP = 2
-    if not AVG_NLL:
-        NORM_CLIP = 5
-    LR = 0.15
 
-    DIM_X = 150
-    DIM_Y = DIM_X
-    HIDDEN_SIZE = 150
-    MIN_LEN_X = 5
-    MIN_LEN_Y = 5
-    MAX_LEN_X = 120
-    MAX_LEN_Y = 50
-    MIN_NUM_X = 1
-    MAX_NUM_X = 1
-    MAX_NUM_Y = None
-    NUM_Y = 1
 
-    UNI_LOW_FREQ_THRESHOLD = 5
 
-    PG_DICT_SIZE = 100000
 
-    W_UNK = "<unk>"
-    W_BOS = "<bos>"
-    W_EOS = "<eos>"
-    W_PAD = "<pad>"
-    W_LS = "<s>"
-    W_RS = "</s>"
