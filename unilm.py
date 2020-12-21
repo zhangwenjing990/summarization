@@ -1,5 +1,4 @@
-# 重写bert模型
-# 重新使用源代码的tokenize方式
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -69,15 +68,6 @@ def padding(batch):
     return padded_inputs, padded_token_type, padded_targets
 
 
-def unilm_mask1(inputs, token_type):
-    batch_size, seq_len = token_type.size()
-    token_type = token_type
-    extend1 = token_type.unsqueeze(1)
-    extend2 = token_type.unsqueeze(-1)
-    lower_triangle = torch.ones((batch_size, seq_len, seq_len), dtype=torch.int64).tril()
-    attention_mask = (1 - extend1) * (1 - extend2) + extend2 * lower_triangle
-    padded_attention_mask = attention_mask * ((inputs.unsqueeze(-1) > 0).to(dtype=torch.int64))
-    return padded_attention_mask
 
 
 def unilm_mask(inputs, s):
@@ -92,7 +82,7 @@ def train():
     char2idx, keep_tokens = load_chinese_base_vocab(cfg.vocab_path)
     tokenizer = Tokenizer(char2idx)
     # train_data = glob(cfg.train_data_path + '*')[16 * 1000 * 35:16 * 1000 * 40]
-    train_data = glob(cfg.train_data_path + '*')[8 * 5000 * 20:8 * 5000 * 25]
+    train_data = glob(cfg.train_data_path + '*')[8 * 5000 * 5: 8 * 5000 * 10]
     train_dataset = CustomDataset(train_data, tokenizer, cfg.max_seq_len)
     train_dataloader = DataLoader(train_dataset, batch_size=cfg.batch_size, collate_fn=padding,
                                   shuffle=True, num_workers=4, pin_memory=True)
@@ -236,9 +226,6 @@ def test_string(content, tokenizer, model):
     # 逐步解码
 
 
-def main():
-    # 根据参数，训练/评估/测试
-    train()
 
 if __name__ == '__main__':
     train()

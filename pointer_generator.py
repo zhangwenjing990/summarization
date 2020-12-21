@@ -1,4 +1,5 @@
 
+
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -114,8 +115,8 @@ def train():
     total_num = sum(p.numel() for p in model.parameters())
     print('参数量:{}'.format(total_num))
 
-    model = load_model('./outputs/models/' + 'epoch_v5_test1_1', model) #todo
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # model = load_model('./outputs/models/' + 'epoch_v5_test1_5', model) #todo
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
 
     train_dataset = CustomDataset(cfg.train_data_path, cfg)
     train_data_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, shuffle=True, collate_fn=padding, num_workers=4, pin_memory=True)
@@ -124,7 +125,7 @@ def train():
     # train_dataset = CustomDataset(cfg.valid_data_path, cfg)
     # train_data_loader = DataLoader(train_dataset, batch_size=cfg.batch_size, collate_fn=padding)
 
-    for epoch in range(2, cfg.max_epoch):
+    for epoch in range(6, cfg.max_epoch):
 
         total_vocab_loss, total_coverage_loss, total_words = 0, 0, 0
         iteration = 0
@@ -162,7 +163,7 @@ def train():
                 print('|-> total_train_loss: {} | total_train_loss_c: {}'.format(total_vocab_loss / total_words,
                                                                                  total_coverage_loss / total_words))
                 print('|-> total_evalu_loss: {} | total_evalu_loss_c: {}'.format(eval_loss, eval_loss_c))
-                f = './outputs/models/' + 'epoch_v5_test1_' + str(epoch)
+                f = cfg.save_model_path + 'epoch_v5_test1_' + str(epoch)
                 torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()}, f)
 
         eval_loss, eval_loss_c = evaluate(model, cfg)
@@ -171,7 +172,7 @@ def train():
                                                                       total_coverage_loss / total_words))
         print(' total_evalu_loss: {} | total_evalu_loss_c: {}'.format(eval_loss, eval_loss_c))
 
-        f = './outputs/models/' + 'epoch_v5_test1_' + str(epoch)
+        f = cfg.save_model_path + 'epoch_v5_test1_' + str(epoch)
         torch.save({"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()}, f)
 
 def load_model(f, model):
